@@ -15,8 +15,8 @@ export default function ProductTable({ products, setProducts, saveProducts, t })
     price: '',
     salePrice: '',
   });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('All');
+  const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem('erp_search') || '');
+  const [category, setCategory] = useState(() => localStorage.getItem('erp_category') || 'All');
   const [currentPage, setCurrentPage] = useState(1);
   const [updating, setUpdating] = useState(false);
   const [isNewRow, setIsNewRow] = useState(false);
@@ -235,11 +235,15 @@ export default function ProductTable({ products, setProducts, saveProducts, t })
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
+                  localStorage.setItem('erp_search', e.target.value);
                   setCurrentPage(1);
                 }}
               />
               {searchTerm && (
-                <button className="search-clear" onClick={() => setSearchTerm('')}>
+                <button className="search-clear" onClick={() => {
+                  setSearchTerm('');
+                  localStorage.removeItem('erp_search');
+                }}>
                   &#10005;
                 </button>
               )}
@@ -249,6 +253,7 @@ export default function ProductTable({ products, setProducts, saveProducts, t })
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
+                localStorage.setItem('erp_category', e.target.value);
                 setCurrentPage(1);
               }}
             >

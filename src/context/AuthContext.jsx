@@ -57,6 +57,8 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     localStorage.removeItem('erp_email');
+    localStorage.removeItem('erp_search');
+    localStorage.removeItem('erp_category');
     setAuth(null);
   }, []);
 
