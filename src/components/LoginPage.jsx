@@ -59,7 +59,7 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
           <div className="form-group">
             <label>{t.email}</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t.emailPlaceholder}
