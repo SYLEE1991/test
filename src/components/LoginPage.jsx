@@ -17,14 +17,19 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
       return;
     }
 
+    let url = serverUrl.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+
     setLoading(true);
     try {
-      const data = await loginApi(serverUrl, email, password);
+      const data = await loginApi(url, email, password);
       const token = data['Access-Token'] || data['access-token'] || data.accessToken || data.token;
       if (!token) {
         throw new Error(t.loginTokenNotFound);
       }
-      onLogin(token, email, serverUrl);
+      onLogin(token, email, url);
     } catch (err) {
       setError(err.message || t.loginFailed);
     } finally {
@@ -44,7 +49,7 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
           <div className="form-group">
             <label>{t.serverUrl}</label>
             <input
-              type="url"
+              type="text"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
               placeholder={t.serverUrlPlaceholder}
