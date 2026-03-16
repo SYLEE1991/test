@@ -1,6 +1,3 @@
-const API_URL = '/api/product';
-const API_TOKEN = import.meta.env.VITE_API_TOKEN;
-
 function getLayoutId(price, salePrice) {
   if (salePrice !== 0 && salePrice < price) {
     return 'demo_sale';
@@ -20,18 +17,20 @@ function buildProductEntry({ productCode, productName, price, salePrice }) {
   };
 }
 
-async function postProducts(productEntries) {
+async function postProducts(serverUrl, token, productEntries) {
+  const url = `${serverUrl.replace(/\/+$/, '')}/api/product`;
+
   const body = {
     product: productEntries,
     storeCode: 'test',
     taskId: -1,
   };
 
-  const response = await fetch(API_URL, {
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Access-Token': API_TOKEN,
+      'Access-Token': token,
     },
     body: JSON.stringify(body),
   });
@@ -43,11 +42,11 @@ async function postProducts(productEntries) {
   return response.json();
 }
 
-export async function updateProduct(product) {
-  return postProducts([buildProductEntry(product)]);
+export async function updateProduct(serverUrl, token, product) {
+  return postProducts(serverUrl, token, [buildProductEntry(product)]);
 }
 
-export async function updateProductsBulk(products) {
+export async function updateProductsBulk(serverUrl, token, products) {
   const entries = products.map(buildProductEntry);
-  return postProducts(entries);
+  return postProducts(serverUrl, token, entries);
 }

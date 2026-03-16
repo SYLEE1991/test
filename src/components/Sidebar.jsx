@@ -1,14 +1,14 @@
 import { useState } from 'react';
 
-export default function Sidebar({ t }) {
+export default function Sidebar({ t, onLogout }) {
   const [active] = useState('productManagement');
 
   const menuItems = [
-    { key: 'dashboard', icon: '⊞', label: t.dashboard },
-    { key: 'productManagement', icon: '⟳', label: t.productManagement },
-    { key: 'inventory', icon: '☰', label: t.inventory },
-    { key: 'orders', icon: '☰', label: t.orders },
-    { key: 'settings', icon: '⚙', label: t.settings },
+    { key: 'dashboard', icon: '\u229E', label: t.dashboard },
+    { key: 'productManagement', icon: '\u27F3', label: t.productManagement },
+    { key: 'inventory', icon: '\u2630', label: t.inventory },
+    { key: 'orders', icon: '\u2630', label: t.orders },
+    { key: 'settings', icon: '\u2699', label: t.settings },
   ];
 
   return (
@@ -28,8 +28,8 @@ export default function Sidebar({ t }) {
         ))}
       </nav>
       <div className="sidebar-footer">
-        <div className="nav-item">
-          <span className="nav-icon">⏻</span>
+        <div className="nav-item" onClick={onLogout}>
+          <span className="nav-icon">{'\u23FB'}</span>
           <span className="nav-label">{t.logout}</span>
         </div>
       </div>

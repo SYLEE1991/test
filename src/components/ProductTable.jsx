@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { updateProduct, updateProductsBulk } from '../api/productApi';
+import { useAuth } from '../context/AuthContext';
 import Toast from './Toast';
 
 const PAGE_SIZE = 10;
 
 export default function ProductTable({ products, setProducts, t }) {
+  const { auth } = useAuth();
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({
     productCode: '',
@@ -83,7 +85,7 @@ export default function ProductTable({ products, setProducts, t }) {
     if (!editValues.productCode || !editValues.productName) return;
     setUpdating(true);
     try {
-      await updateProduct(editValues);
+      await updateProduct(auth.serverUrl, auth.token, editValues);
 
       setProducts((prev) =>
         prev.map((p) =>
@@ -115,7 +117,7 @@ export default function ProductTable({ products, setProducts, t }) {
     if (validProducts.length === 0) return;
     setSendingAll(true);
     try {
-      await updateProductsBulk(validProducts);
+      await updateProductsBulk(auth.serverUrl, auth.token, validProducts);
       showToast(t.sendAllSuccess(validProducts.length), 'success');
     } catch (err) {
       showToast(`${t.updateError} (${err.message})`, 'error');

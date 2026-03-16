@@ -1,4 +1,4 @@
-export default function Header({ t, lang, setLang }) {
+export default function Header({ t, lang, setLang, email }) {
   return (
     <div className="header">
       <h1>{t.appTitle}</h1>
@@ -12,8 +12,8 @@ export default function Header({ t, lang, setLang }) {
           <option value="ko">{t.korean}</option>
         </select>
         <div className="user-info">
-          <span className="user-icon">👤</span>
-          <span>admin</span>
+          <span className="user-icon">&#128100;</span>
+          <span>{email}</span>
         </div>
       </div>
     </div>
