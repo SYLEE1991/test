@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { loginApi } from '../api/authApi';
 
 export default function LoginPage({ t, lang, setLang, onLogin }) {
-  const [serverUrl, setServerUrl] = useState('https://saas-asia.partronesl.io');
+  const [serverUrl, setServerUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +36,7 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <h1 className="login-logo">ERP</h1>
+          <h1 className="login-logo">PartronESL</h1>
           <p className="login-subtitle">{t.appTitle}</p>
         </div>
 
@@ -47,7 +47,7 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
               type="url"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="https://saas-asia.partronesl.io"
+              placeholder={t.serverUrlPlaceholder}
             />
           </div>
 
