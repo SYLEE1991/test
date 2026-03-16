@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { updateProduct } from '../api/productApi';
+import Toast from './Toast';
 
 const PAGE_SIZE = 5;
 
@@ -15,6 +17,11 @@ export default function ProductTable({ products, setProducts, t }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [updating, setUpdating] = useState(false);
   const [isNewRow, setIsNewRow] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((message, type) => {
+    setToast({ message, type });
+  }, []);
 
   const categories = ['All', ...new Set(products.map((p) => p.category))];
 
@@ -75,8 +82,8 @@ export default function ProductTable({ products, setProducts, t }) {
     if (!editValues.productCode || !editValues.productName) return;
     setUpdating(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await updateProduct(editValues);
+
       setProducts((prev) =>
         prev.map((p) =>
           p.id === product.id
@@ -92,9 +99,9 @@ export default function ProductTable({ products, setProducts, t }) {
       );
       setEditingId(null);
       setIsNewRow(false);
-      alert(t.updateSuccess);
-    } catch {
-      alert(t.updateError);
+      showToast(isNewRow ? t.createSuccess : t.updateSuccess, 'success');
+    } catch (err) {
+      showToast(`${t.updateError} (${err.message})`, 'error');
     } finally {
       setUpdating(false);
     }
@@ -105,6 +112,14 @@ export default function ProductTable({ products, setProducts, t }) {
 
   return (
     <div className="product-section">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       <div className="product-header">
         <h2>{t.productList}</h2>
         <button className="btn-add" onClick={handleAddNew} disabled={isNewRow}>
@@ -236,9 +251,9 @@ export default function ProductTable({ products, setProducts, t }) {
                         onClick={() => handleUpdate(product)}
                         disabled={updating}
                       >
-                        {t.update}
+                        {updating ? t.updating || '...' : t.update}
                       </button>
-                      <button className="btn-cancel" onClick={handleCancel}>
+                      <button className="btn-cancel" onClick={handleCancel} disabled={updating}>
                         {t.cancel}
                       </button>
                     </div>
@@ -256,6 +271,12 @@ export default function ProductTable({ products, setProducts, t }) {
           </tbody>
         </table>
       </div>
+
+      {updating && (
+        <div className="loading-overlay">
+          <div className="spinner" />
+        </div>
+      )}
 
       <div className="table-footer">
         <span>{t.showingEntries(from, to, filtered.length)}</span>
