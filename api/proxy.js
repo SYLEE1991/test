@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   delete headers['x-target-url'];
   delete headers['host'];
   delete headers['connection'];
+  delete headers['accept-encoding'];
 
   try {
     const response = await fetch(targetUrl, {
@@ -22,7 +23,8 @@ export default async function handler(req, res) {
     res.status(response.status);
 
     for (const [key, value] of response.headers.entries()) {
-      if (key.toLowerCase() === 'transfer-encoding') continue;
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'transfer-encoding' || lowerKey === 'content-encoding') continue;
       res.setHeader(key, value);
     }
 
