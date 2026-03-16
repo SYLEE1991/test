@@ -6,7 +6,7 @@ import Toast from './Toast';
 
 const PAGE_SIZE = 10;
 
-export default function ProductTable({ products, setProducts, t }) {
+export default function ProductTable({ products, setProducts, saveProducts, t }) {
   const { auth } = useAuth();
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({
@@ -121,8 +121,8 @@ export default function ProductTable({ products, setProducts, t }) {
     try {
       await updateProduct(auth.serverUrl, auth.token, verifiedStoreCode, editValues);
 
-      setProducts((prev) =>
-        prev.map((p) =>
+      setProducts((prev) => {
+        const updated = prev.map((p) =>
           p.id === product.id
             ? {
                 ...p,
@@ -132,8 +132,10 @@ export default function ProductTable({ products, setProducts, t }) {
                 salePrice: parseFloat(editValues.salePrice) || 0,
               }
             : p
-        )
-      );
+        );
+        saveProducts(updated);
+        return updated;
+      });
       setEditingId(null);
       setIsNewRow(false);
       showToast(isNewRow ? t.createSuccess : t.updateSuccess, 'success');

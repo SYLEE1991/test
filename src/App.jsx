@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, loadProducts, saveProducts } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -10,7 +10,7 @@ import './App.css';
 
 function AppContent() {
   const [lang, setLang] = useState('en');
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(() => loadProducts() || initialProducts);
   const { auth, login, logout } = useAuth();
   const t = translations[lang];
 
@@ -31,7 +31,7 @@ function AppContent() {
       <div className="main">
         <Header t={t} lang={lang} setLang={setLang} email={auth.email} />
         <div className="content">
-          <ProductTable products={products} setProducts={setProducts} t={t} />
+          <ProductTable products={products} setProducts={setProducts} saveProducts={saveProducts} t={t} />
         </div>
       </div>
     </div>

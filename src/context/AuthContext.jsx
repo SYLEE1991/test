@@ -4,15 +4,15 @@ const AuthContext = createContext(null);
 
 const STORAGE_KEYS = {
   token: 'erp_token',
-  email: 'erp_email',
-  serverUrl: 'erp_serverUrl',
-  storeCode: 'erp_storeCode',
+  server: 'erp_server',
+  storeCode: 'erp_store_code',
+  products: 'erp_products',
 };
 
 function loadAuth() {
   const token = localStorage.getItem(STORAGE_KEYS.token);
-  const email = localStorage.getItem(STORAGE_KEYS.email);
-  const serverUrl = localStorage.getItem(STORAGE_KEYS.serverUrl);
+  const email = localStorage.getItem('erp_email');
+  const serverUrl = localStorage.getItem(STORAGE_KEYS.server);
   if (token && email && serverUrl) {
     return { token, email, serverUrl };
   }
@@ -31,18 +31,32 @@ export function saveStoreCode(code) {
   }
 }
 
+export function loadProducts() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.products);
+    return data ? JSON.parse(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProducts(products) {
+  localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
+}
+
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(loadAuth);
 
   const login = useCallback((token, email, serverUrl) => {
     localStorage.setItem(STORAGE_KEYS.token, token);
-    localStorage.setItem(STORAGE_KEYS.email, email);
-    localStorage.setItem(STORAGE_KEYS.serverUrl, serverUrl);
+    localStorage.setItem('erp_email', email);
+    localStorage.setItem(STORAGE_KEYS.server, serverUrl);
     setAuth({ token, email, serverUrl });
   }, []);
 
   const logout = useCallback(() => {
     Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem('erp_email');
     setAuth(null);
   }, []);
 
