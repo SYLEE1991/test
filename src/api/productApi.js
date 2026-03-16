@@ -1,3 +1,5 @@
+import { proxyFetch } from './proxyFetch';
+
 function getLayoutId(price, salePrice) {
   if (salePrice !== 0 && salePrice < price) {
     return 'demo_sale';
@@ -26,7 +28,7 @@ async function postProducts(serverUrl, token, storeCode, productEntries) {
     taskId: -1,
   };
 
-  const response = await fetch(url, {
+  const response = await proxyFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

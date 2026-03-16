@@ -1,7 +1,9 @@
+import { proxyFetch } from './proxyFetch';
+
 export async function verifyStore(serverUrl, token, storeCode) {
   const url = `${serverUrl.replace(/\/+$/, '')}/api/config/store/${encodeURIComponent(storeCode)}`;
 
-  const response = await fetch(url, {
+  const response = await proxyFetch(url, {
     method: 'GET',
     headers: {
       'Access-Token': token,
