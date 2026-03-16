@@ -28,6 +28,9 @@ const translations = {
     updateSuccess: 'Product updated successfully!',
     updateError: 'Failed to update product.',
     createSuccess: 'Product created successfully!',
+    sendAll: 'Send All',
+    sending: 'Sending...',
+    sendAllSuccess: (count) => `${count} products sent successfully!`,
   },
   ko: {
     appTitle: 'ERP 상품 관리',
@@ -58,6 +61,9 @@ const translations = {
     updateSuccess: '상품이 성공적으로 수정되었습니다!',
     updateError: '상품 수정에 실패했습니다.',
     createSuccess: '상품이 성공적으로 생성되었습니다!',
+    sendAll: '전체 전송',
+    sending: '전송 중...',
+    sendAllSuccess: (count) => `${count}개 상품이 성공적으로 전송되었습니다!`,
   },
 };
 

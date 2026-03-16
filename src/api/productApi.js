@@ -8,20 +8,21 @@ function getLayoutId(price, salePrice) {
   return 'demo_normal';
 }
 
-export async function updateProduct({ productCode, productName, price, salePrice }) {
+function buildProductEntry({ productCode, productName, price, salePrice }) {
   const priceNum = parseFloat(price) || 0;
   const salePriceNum = parseFloat(salePrice) || 0;
+  return {
+    layoutId: getLayoutId(priceNum, salePriceNum),
+    nfc: 'www.partronesl.com',
+    prCode: productCode,
+    prInfo: [productCode, productName, String(priceNum), String(salePriceNum)],
+    secondCode: '',
+  };
+}
 
+async function postProducts(productEntries) {
   const body = {
-    product: [
-      {
-        layoutId: getLayoutId(priceNum, salePriceNum),
-        nfc: 'www.partronesl.com',
-        prCode: productCode,
-        prInfo: [productCode, productName, String(priceNum), String(salePriceNum)],
-        secondCode: '',
-      },
-    ],
+    product: productEntries,
     storeCode: 'test',
     taskId: -1,
   };
@@ -40,4 +41,13 @@ export async function updateProduct({ productCode, productName, price, salePrice
   }
 
   return response.json();
+}
+
+export async function updateProduct(product) {
+  return postProducts([buildProductEntry(product)]);
+}
+
+export async function updateProductsBulk(products) {
+  const entries = products.map(buildProductEntry);
+  return postProducts(entries);
 }

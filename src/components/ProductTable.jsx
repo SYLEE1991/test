@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import { updateProduct } from '../api/productApi';
+import { updateProduct, updateProductsBulk } from '../api/productApi';
 import Toast from './Toast';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 export default function ProductTable({ products, setProducts, t }) {
   const [editingId, setEditingId] = useState(null);
@@ -18,6 +18,7 @@ export default function ProductTable({ products, setProducts, t }) {
   const [updating, setUpdating] = useState(false);
   const [isNewRow, setIsNewRow] = useState(false);
   const [toast, setToast] = useState(null);
+  const [sendingAll, setSendingAll] = useState(false);
 
   const showToast = useCallback((message, type) => {
     setToast({ message, type });
@@ -107,6 +108,22 @@ export default function ProductTable({ products, setProducts, t }) {
     }
   };
 
+  const handleSendAll = async () => {
+    const validProducts = pageProducts.filter(
+      (p) => p.productCode && p.productName
+    );
+    if (validProducts.length === 0) return;
+    setSendingAll(true);
+    try {
+      await updateProductsBulk(validProducts);
+      showToast(t.sendAllSuccess(validProducts.length), 'success');
+    } catch (err) {
+      showToast(`${t.updateError} (${err.message})`, 'error');
+    } finally {
+      setSendingAll(false);
+    }
+  };
+
   const from = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const to = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
@@ -122,9 +139,18 @@ export default function ProductTable({ products, setProducts, t }) {
 
       <div className="product-header">
         <h2>{t.productList}</h2>
-        <button className="btn-add" onClick={handleAddNew} disabled={isNewRow}>
-          {t.addNewProduct}
-        </button>
+        <div className="header-buttons">
+          <button
+            className="btn-send-all"
+            onClick={handleSendAll}
+            disabled={sendingAll || updating || pageProducts.length === 0}
+          >
+            {sendingAll ? t.sending : t.sendAll}
+          </button>
+          <button className="btn-add" onClick={handleAddNew} disabled={isNewRow}>
+            {t.addNewProduct}
+          </button>
+        </div>
       </div>
 
       <div className="product-toolbar">
@@ -272,7 +298,7 @@ export default function ProductTable({ products, setProducts, t }) {
         </table>
       </div>
 
-      {updating && (
+      {(updating || sendingAll) && (
         <div className="loading-overlay">
           <div className="spinner" />
         </div>

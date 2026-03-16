@@ -154,6 +154,32 @@
   line-height: normal;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-send-all {
+  background: #ff9500;
+  color: #fff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-send-all:hover {
+  background: #e68600;
+}
+
+.btn-send-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-add {
   background: #5b8cff;
   color: #fff;
