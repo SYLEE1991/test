@@ -1,10 +1,12 @@
 {
-  "headers": [
+  "rewrites": [
     {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
-      ]
+      "source": "/api/auth/:path*",
+      "destination": "https://saas-asia.partronesl.io/api/auth/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://saas-asia.partronesl.io/api/:path*"
     }
   ]
 }
