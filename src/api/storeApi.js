@@ -1,6 +1,5 @@
 export async function verifyStore(serverUrl, token, storeCode) {
-  const baseUrl = import.meta.env.PROD ? '' : serverUrl.replace(/\/+$/, '');
-  const url = `${baseUrl}/api/config/store/${encodeURIComponent(storeCode)}`;
+  const url = `${serverUrl.replace(/\/+$/, '')}/api/config/store/${encodeURIComponent(storeCode)}`;
 
   const response = await fetch(url, {
     method: 'GET',

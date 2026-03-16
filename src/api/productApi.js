@@ -18,8 +18,7 @@ function buildProductEntry({ productCode, productName, price, salePrice }) {
 }
 
 async function postProducts(serverUrl, token, storeCode, productEntries) {
-  const baseUrl = import.meta.env.PROD ? '' : serverUrl.replace(/\/+$/, '');
-  const url = `${baseUrl}/api/product`;
+  const url = `${serverUrl.replace(/\/+$/, '')}/api/product`;
 
   const body = {
     product: productEntries,
