@@ -10,6 +10,9 @@ export default function Header({ t, lang, setLang, email }) {
         >
           <option value="en">{t.english}</option>
           <option value="ko">{t.korean}</option>
+          <option value="es">{t.spanish}</option>
+          <option value="vi">{t.vietnamese}</option>
+          <option value="ja">{t.japanese}</option>
         </select>
         <div className="user-info">
           <span className="user-icon">&#128100;</span>

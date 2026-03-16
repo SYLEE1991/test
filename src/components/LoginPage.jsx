@@ -91,6 +91,9 @@ export default function LoginPage({ t, lang, setLang, onLogin }) {
           >
             <option value="en">{t.english}</option>
             <option value="ko">{t.korean}</option>
+            <option value="es">{t.spanish}</option>
+            <option value="vi">{t.vietnamese}</option>
+            <option value="ja">{t.japanese}</option>
           </select>
         </div>
       </div>
