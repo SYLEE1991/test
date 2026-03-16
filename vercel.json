@@ -5,6 +5,10 @@
       "destination": "https://saas-asia.partronesl.io/api/auth/:path*"
     },
     {
+      "source": "/api/config/:path*",
+      "destination": "https://saas-asia.partronesl.io/api/config/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://saas-asia.partronesl.io/api/:path*"
     }

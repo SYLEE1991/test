@@ -17,13 +17,13 @@ function buildProductEntry({ productCode, productName, price, salePrice }) {
   };
 }
 
-async function postProducts(serverUrl, token, productEntries) {
+async function postProducts(serverUrl, token, storeCode, productEntries) {
   const baseUrl = import.meta.env.PROD ? '' : serverUrl.replace(/\/+$/, '');
   const url = `${baseUrl}/api/product`;
 
   const body = {
     product: productEntries,
-    storeCode: 'test',
+    storeCode,
     taskId: -1,
   };
 
@@ -43,11 +43,11 @@ async function postProducts(serverUrl, token, productEntries) {
   return response.json();
 }
 
-export async function updateProduct(serverUrl, token, product) {
-  return postProducts(serverUrl, token, [buildProductEntry(product)]);
+export async function updateProduct(serverUrl, token, storeCode, product) {
+  return postProducts(serverUrl, token, storeCode, [buildProductEntry(product)]);
 }
 
-export async function updateProductsBulk(serverUrl, token, products) {
+export async function updateProductsBulk(serverUrl, token, storeCode, products) {
   const entries = products.map(buildProductEntry);
-  return postProducts(serverUrl, token, entries);
+  return postProducts(serverUrl, token, storeCode, entries);
 }

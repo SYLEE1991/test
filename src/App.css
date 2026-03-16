@@ -241,6 +241,91 @@
   flex: 1;
 }
 
+/* Store Code Bar */
+.store-code-bar {
+  background: #f7f8fc;
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.store-code-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.store-code-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.store-code-input {
+  flex: 1;
+  max-width: 400px;
+  padding: 10px 14px;
+  border: 1px solid #dde0ea;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fff;
+}
+
+.store-code-input:focus {
+  border-color: #5b8cff;
+  box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.15);
+}
+
+.store-code-input:disabled {
+  background: #f0f0f0;
+}
+
+.btn-store-verify {
+  background: #2d2d3f;
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-store-verify:hover {
+  background: #3a3a50;
+}
+
+.btn-store-verify:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.store-error {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.store-success {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #f0fff4;
+  border: 1px solid #b7eb8f;
+  color: #237804;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 /* Product Section - White card */
 .product-section {
   background: #fff;
