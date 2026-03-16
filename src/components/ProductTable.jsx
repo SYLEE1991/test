@@ -4,11 +4,17 @@ const PAGE_SIZE = 5;
 
 export default function ProductTable({ products, setProducts, t }) {
   const [editingId, setEditingId] = useState(null);
-  const [editValues, setEditValues] = useState({ price: '', salePrice: '' });
+  const [editValues, setEditValues] = useState({
+    productCode: '',
+    productName: '',
+    price: '',
+    salePrice: '',
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [updating, setUpdating] = useState(false);
+  const [isNewRow, setIsNewRow] = useState(false);
 
   const categories = ['All', ...new Set(products.map((p) => p.category))];
 
@@ -28,15 +34,45 @@ export default function ProductTable({ products, setProducts, t }) {
 
   const handleEdit = (product) => {
     setEditingId(product.id);
-    setEditValues({ price: product.price, salePrice: product.salePrice });
+    setIsNewRow(false);
+    setEditValues({
+      productCode: product.productCode,
+      productName: product.productName,
+      price: product.price,
+      salePrice: product.salePrice,
+    });
   };
 
   const handleCancel = () => {
+    if (isNewRow) {
+      setProducts((prev) => prev.filter((p) => p.id !== editingId));
+    }
     setEditingId(null);
-    setEditValues({ price: '', salePrice: '' });
+    setIsNewRow(false);
+    setEditValues({ productCode: '', productName: '', price: '', salePrice: '' });
+  };
+
+  const handleAddNew = () => {
+    const newId = Math.max(...products.map((p) => p.id), 0) + 1;
+    const newProduct = {
+      id: newId,
+      productCode: '',
+      productName: '',
+      price: 0,
+      salePrice: 0,
+      category: 'Food',
+    };
+    setProducts((prev) => [newProduct, ...prev]);
+    setEditingId(newId);
+    setIsNewRow(true);
+    setEditValues({ productCode: '', productName: '', price: '', salePrice: '' });
+    setCurrentPage(1);
+    setSearchTerm('');
+    setCategory('All');
   };
 
   const handleUpdate = async (product) => {
+    if (!editValues.productCode || !editValues.productName) return;
     setUpdating(true);
     try {
       // Simulate API call
@@ -46,13 +82,16 @@ export default function ProductTable({ products, setProducts, t }) {
           p.id === product.id
             ? {
                 ...p,
-                price: parseFloat(editValues.price),
-                salePrice: parseFloat(editValues.salePrice),
+                productCode: editValues.productCode,
+                productName: editValues.productName,
+                price: parseFloat(editValues.price) || 0,
+                salePrice: parseFloat(editValues.salePrice) || 0,
               }
             : p
         )
       );
       setEditingId(null);
+      setIsNewRow(false);
       alert(t.updateSuccess);
     } catch {
       alert(t.updateError);
@@ -68,12 +107,14 @@ export default function ProductTable({ products, setProducts, t }) {
     <div className="product-section">
       <div className="product-header">
         <h2>{t.productList}</h2>
-        <button className="btn-add">{t.addNewProduct}</button>
+        <button className="btn-add" onClick={handleAddNew} disabled={isNewRow}>
+          {t.addNewProduct}
+        </button>
       </div>
 
       <div className="product-toolbar">
         <div className="search-box">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">&#128269;</span>
           <input
             type="text"
             placeholder={t.searchProduct}
@@ -85,7 +126,7 @@ export default function ProductTable({ products, setProducts, t }) {
           />
           {searchTerm && (
             <button className="search-clear" onClick={() => setSearchTerm('')}>
-              ✕
+              &#10005;
             </button>
           )}
         </div>
@@ -121,9 +162,37 @@ export default function ProductTable({ products, setProducts, t }) {
           </thead>
           <tbody>
             {pageProducts.map((product) => (
-              <tr key={product.id}>
-                <td>{product.productCode}</td>
-                <td>{product.productName}</td>
+              <tr key={product.id} className={editingId === product.id && isNewRow ? 'new-row' : ''}>
+                <td>
+                  {editingId === product.id ? (
+                    <input
+                      type="text"
+                      className="edit-input edit-input-text"
+                      value={editValues.productCode}
+                      placeholder={t.productCode}
+                      onChange={(e) =>
+                        setEditValues((v) => ({ ...v, productCode: e.target.value }))
+                      }
+                    />
+                  ) : (
+                    product.productCode
+                  )}
+                </td>
+                <td>
+                  {editingId === product.id ? (
+                    <input
+                      type="text"
+                      className="edit-input edit-input-text"
+                      value={editValues.productName}
+                      placeholder={t.productName}
+                      onChange={(e) =>
+                        setEditValues((v) => ({ ...v, productName: e.target.value }))
+                      }
+                    />
+                  ) : (
+                    product.productName
+                  )}
+                </td>
                 <td>
                   {editingId === product.id ? (
                     <input
@@ -131,6 +200,7 @@ export default function ProductTable({ products, setProducts, t }) {
                       step="0.01"
                       className="edit-input"
                       value={editValues.price}
+                      placeholder="0.00"
                       onChange={(e) =>
                         setEditValues((v) => ({ ...v, price: e.target.value }))
                       }
@@ -146,6 +216,7 @@ export default function ProductTable({ products, setProducts, t }) {
                       step="0.01"
                       className="edit-input"
                       value={editValues.salePrice}
+                      placeholder="0.00"
                       onChange={(e) =>
                         setEditValues((v) => ({
                           ...v,
