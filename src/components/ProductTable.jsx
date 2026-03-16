@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { updateProduct, updateProductsBulk } from '../api/productApi';
 import { verifyStore } from '../api/storeApi';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, loadStoreCode, saveStoreCode } from '../context/AuthContext';
 import Toast from './Toast';
 
 const PAGE_SIZE = 10;
@@ -23,8 +23,9 @@ export default function ProductTable({ products, setProducts, t }) {
   const [toast, setToast] = useState(null);
   const [sendingAll, setSendingAll] = useState(false);
 
-  const [storeCodeInput, setStoreCodeInput] = useState('');
-  const [verifiedStoreCode, setVerifiedStoreCode] = useState(null);
+  const savedStoreCode = loadStoreCode();
+  const [storeCodeInput, setStoreCodeInput] = useState(savedStoreCode);
+  const [verifiedStoreCode, setVerifiedStoreCode] = useState(savedStoreCode || null);
   const [storeVerifying, setStoreVerifying] = useState(false);
   const [storeError, setStoreError] = useState('');
 
@@ -43,6 +44,7 @@ export default function ProductTable({ products, setProducts, t }) {
     try {
       await verifyStore(auth.serverUrl, auth.token, trimmed);
       setVerifiedStoreCode(trimmed);
+      saveStoreCode(trimmed);
       setStoreError('');
     } catch (err) {
       setVerifiedStoreCode(null);
