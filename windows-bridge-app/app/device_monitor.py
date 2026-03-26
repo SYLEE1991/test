@@ -76,6 +76,67 @@ class DeviceMonitor:
             results = w.query(query)
             return len(results) > 0
 
+        elif device_cfg.detection_method == "mac_address":
+            # Detect by MAC address prefix (OUI) on the ethernet adapter
+            return self._check_mac_address(w, device_cfg.mac_prefix)
+
+        elif device_cfg.detection_method == "ethernet_link":
+            # Simply detect if the ethernet adapter has link up
+            return self._check_ethernet_link(w)
+
+        return False
+
+    def _check_mac_address(self, w, mac_prefix: str) -> bool:
+        """Check if any connected network adapter's peer has a matching MAC prefix.
+
+        For directly-connected devices (e.g. via ethernet cable), we check
+        the ARP table for entries on the ethernet adapter's subnet that
+        match the target MAC OUI prefix.
+        """
+        import subprocess
+
+        # Normalize prefix: accept "00:1A:2B", "00-1A-2B", "001A2B"
+        prefix = mac_prefix.upper().replace(":", "-")
+        if "-" not in prefix and len(prefix) >= 6:
+            prefix = f"{prefix[0:2]}-{prefix[2:4]}-{prefix[4:6]}"
+
+        # Query ARP table for the ethernet adapter's subnet
+        try:
+            result = subprocess.run(
+                ["arp", "-a"],
+                capture_output=True, text=True, timeout=10,
+            )
+            for line in result.stdout.split("\n"):
+                # ARP output format: "  192.168.1.1    00-1a-2b-3c-4d-5e   dynamic"
+                line = line.strip()
+                parts = line.split()
+                if len(parts) >= 2:
+                    mac = parts[1].upper()
+                    if mac.startswith(prefix):
+                        logger.debug("Found matching MAC: %s (IP: %s)", mac, parts[0])
+                        return True
+        except Exception:
+            logger.exception("ARP table query failed")
+
+        # Fallback: also check directly connected adapters via WMI
+        ethernet_name = self._config.ethernet_adapter.name
+        adapters = w.Win32_NetworkAdapter(NetConnectionID=ethernet_name)
+        for adapter in adapters:
+            if adapter.MACAddress:
+                peer_mac = adapter.MACAddress.upper().replace(":", "-")
+                if peer_mac.startswith(prefix):
+                    return True
+
+        return False
+
+    def _check_ethernet_link(self, w) -> bool:
+        """Check if the configured ethernet adapter has an active link."""
+        ethernet_name = self._config.ethernet_adapter.name
+        adapters = w.Win32_NetworkAdapter(NetConnectionID=ethernet_name)
+        for adapter in adapters:
+            # NetConnectionStatus: 2 = Connected
+            if adapter.NetConnectionStatus == 2:
+                return True
         return False
 
     @staticmethod

@@ -2,6 +2,7 @@
   "target_device": {
     "hardware_id": "USB\\VID_XXXX&PID_XXXX",
     "friendly_name": "My Network Device",
+    "mac_prefix": "00:1A:2B",
     "detection_method": "hardware_id"
   },
   "ethernet_adapter": {

@@ -7,7 +7,8 @@ from pathlib import Path
 class TargetDevice:
     hardware_id: str
     friendly_name: str
-    detection_method: str  # "hardware_id" or "friendly_name"
+    mac_prefix: str  # OUI prefix, e.g. "00:1A:2B" (first 3 bytes of MAC)
+    detection_method: str  # "hardware_id", "friendly_name", "mac_address", or "ethernet_link"
 
 
 @dataclasses.dataclass
@@ -53,6 +54,7 @@ DEFAULT_CONFIG = {
     "target_device": {
         "hardware_id": "USB\\VID_XXXX&PID_XXXX",
         "friendly_name": "My Network Device",
+        "mac_prefix": "00:1A:2B",
         "detection_method": "hardware_id",
     },
     "ethernet_adapter": {

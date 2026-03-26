@@ -31,8 +31,12 @@ class SettingsWindow:
 
         ttk.Label(device_frame, text="Detection Method:").grid(row=0, column=0, sticky="w", pady=5)
         self._detection_method = tk.StringVar(value=config.target_device.detection_method)
-        ttk.Radiobutton(device_frame, text="Hardware ID", variable=self._detection_method, value="hardware_id").grid(row=0, column=1, sticky="w")
-        ttk.Radiobutton(device_frame, text="Friendly Name", variable=self._detection_method, value="friendly_name").grid(row=0, column=2, sticky="w")
+        method_frame = ttk.Frame(device_frame)
+        method_frame.grid(row=0, column=1, columnspan=2, sticky="w")
+        ttk.Radiobutton(method_frame, text="Hardware ID", variable=self._detection_method, value="hardware_id").pack(side="left")
+        ttk.Radiobutton(method_frame, text="Name", variable=self._detection_method, value="friendly_name").pack(side="left", padx=5)
+        ttk.Radiobutton(method_frame, text="MAC", variable=self._detection_method, value="mac_address").pack(side="left", padx=5)
+        ttk.Radiobutton(method_frame, text="Link", variable=self._detection_method, value="ethernet_link").pack(side="left", padx=5)
 
         ttk.Label(device_frame, text="Hardware ID:").grid(row=1, column=0, sticky="w", pady=5)
         self._hardware_id = tk.StringVar(value=config.target_device.hardware_id)
@@ -42,10 +46,15 @@ class SettingsWindow:
         self._friendly_name = tk.StringVar(value=config.target_device.friendly_name)
         ttk.Entry(device_frame, textvariable=self._friendly_name, width=40).grid(row=2, column=1, columnspan=2, sticky="w")
 
-        ttk.Button(device_frame, text="Scan USB Devices", command=self._scan_devices).grid(row=3, column=0, columnspan=3, pady=10)
+        ttk.Label(device_frame, text="MAC Prefix (OUI):").grid(row=3, column=0, sticky="w", pady=5)
+        self._mac_prefix = tk.StringVar(value=config.target_device.mac_prefix)
+        ttk.Entry(device_frame, textvariable=self._mac_prefix, width=20).grid(row=3, column=1, sticky="w")
+        ttk.Label(device_frame, text="(예: 00:1A:2B)").grid(row=3, column=2, sticky="w")
+
+        ttk.Button(device_frame, text="Scan USB Devices", command=self._scan_devices).grid(row=4, column=0, columnspan=3, pady=10)
 
         self._device_listbox = tk.Listbox(device_frame, height=6, width=60)
-        self._device_listbox.grid(row=4, column=0, columnspan=3, sticky="we")
+        self._device_listbox.grid(row=5, column=0, columnspan=3, sticky="we")
         self._device_listbox.bind("<<ListboxSelect>>", self._on_device_select)
 
         # -- Network Tab --
@@ -118,6 +127,7 @@ class SettingsWindow:
             target_device=TargetDevice(
                 hardware_id=self._hardware_id.get(),
                 friendly_name=self._friendly_name.get(),
+                mac_prefix=self._mac_prefix.get(),
                 detection_method=self._detection_method.get(),
             ),
             ethernet_adapter=EthernetConfig(
