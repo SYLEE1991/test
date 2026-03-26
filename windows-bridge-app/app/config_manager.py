@@ -54,8 +54,8 @@ DEFAULT_CONFIG = {
     "target_device": {
         "hardware_id": "USB\\VID_XXXX&PID_XXXX",
         "friendly_name": "My Network Device",
-        "mac_prefix": "00:1A:2B",
-        "detection_method": "hardware_id",
+        "mac_prefix": "78:E9:80",
+        "detection_method": "mac_address",
     },
     "ethernet_adapter": {
         "name": "Ethernet",

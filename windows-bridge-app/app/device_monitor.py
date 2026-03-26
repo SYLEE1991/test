@@ -87,47 +87,103 @@ class DeviceMonitor:
         return False
 
     def _check_mac_address(self, w, mac_prefix: str) -> bool:
-        """Check if any connected network adapter's peer has a matching MAC prefix.
+        """Check if a device with matching MAC prefix is on the ethernet link.
 
-        For directly-connected devices (e.g. via ethernet cable), we check
-        the ARP table for entries on the ethernet adapter's subnet that
-        match the target MAC OUI prefix.
+        Steps:
+        1. Check ethernet link is up (no point scanning if cable is disconnected)
+        2. Send a subnet broadcast ping to populate the ARP table
+        3. Also try GetIpNetTable via PowerShell for reliable neighbor discovery
+        4. Search ARP/neighbor table for MAC prefix match
         """
         import subprocess
 
-        # Normalize prefix: accept "00:1A:2B", "00-1A-2B", "001A2B"
-        prefix = mac_prefix.upper().replace(":", "-")
-        if "-" not in prefix and len(prefix) >= 6:
-            prefix = f"{prefix[0:2]}-{prefix[2:4]}-{prefix[4:6]}"
+        # First, check if ethernet link is even up
+        if not self._check_ethernet_link(w):
+            return False
 
-        # Query ARP table for the ethernet adapter's subnet
+        # Normalize prefix: accept "78:E9:80", "78-E9-80", "78E980"
+        raw = mac_prefix.upper().replace(":", "").replace("-", "")
+        if len(raw) < 6:
+            logger.warning("MAC prefix too short: %s", mac_prefix)
+            return False
+        prefix_dash = f"{raw[0:2]}-{raw[2:4]}-{raw[4:6]}"
+        prefix_colon = f"{raw[0:2]}:{raw[2:4]}:{raw[4:6]}"
+
+        # Trigger ARP population: ping the subnet broadcast or common gateway
+        # This ensures the ARP table has entries for recently-connected devices
+        ethernet_cfg = self._config.ethernet_adapter
+        self._populate_arp_table(ethernet_cfg.static_ip, ethernet_cfg.subnet_mask)
+
+        # Method 1: Check ARP table via 'arp -a'
         try:
             result = subprocess.run(
                 ["arp", "-a"],
                 capture_output=True, text=True, timeout=10,
             )
             for line in result.stdout.split("\n"):
-                # ARP output format: "  192.168.1.1    00-1a-2b-3c-4d-5e   dynamic"
                 line = line.strip()
                 parts = line.split()
                 if len(parts) >= 2:
                     mac = parts[1].upper()
-                    if mac.startswith(prefix):
-                        logger.debug("Found matching MAC: %s (IP: %s)", mac, parts[0])
+                    if mac.startswith(prefix_dash):
+                        logger.info("Found target device: MAC=%s IP=%s", mac, parts[0])
                         return True
         except Exception:
             logger.exception("ARP table query failed")
 
-        # Fallback: also check directly connected adapters via WMI
-        ethernet_name = self._config.ethernet_adapter.name
-        adapters = w.Win32_NetworkAdapter(NetConnectionID=ethernet_name)
-        for adapter in adapters:
-            if adapter.MACAddress:
-                peer_mac = adapter.MACAddress.upper().replace(":", "-")
-                if peer_mac.startswith(prefix):
-                    return True
+        # Method 2: Check via PowerShell Get-NetNeighbor (more reliable on Win10+)
+        try:
+            ps_cmd = "Get-NetNeighbor | Where-Object { $_.State -ne 'Unreachable' } | Select-Object -Property IPAddress,LinkLayerAddress | Format-Table -HideTableHeaders"
+            result = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                capture_output=True, text=True, timeout=15,
+            )
+            for line in result.stdout.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split()
+                if len(parts) >= 2:
+                    mac = parts[1].upper().replace("-", "").replace(":", "")
+                    if mac.startswith(raw[:6]):
+                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", parts[1], parts[0])
+                        return True
+        except Exception:
+            logger.exception("Get-NetNeighbor query failed")
 
         return False
+
+    @staticmethod
+    def _populate_arp_table(local_ip: str, subnet_mask: str):
+        """Send broadcast ping to populate ARP table for the local subnet."""
+        import subprocess
+
+        # Calculate broadcast address from IP and mask
+        try:
+            ip_parts = [int(x) for x in local_ip.split(".")]
+            mask_parts = [int(x) for x in subnet_mask.split(".")]
+            broadcast_parts = [(ip_parts[i] | (~mask_parts[i] & 0xFF)) for i in range(4)]
+            broadcast = ".".join(str(x) for x in broadcast_parts)
+
+            # Ping broadcast (will timeout quickly, but populates ARP)
+            subprocess.run(
+                ["ping", "-n", "1", "-w", "500", broadcast],
+                capture_output=True, timeout=5,
+            )
+
+            # Also ping a few common addresses in the subnet
+            base = [ip_parts[i] & mask_parts[i] for i in range(4)]
+            for host in [1, 2, 254]:
+                target = base.copy()
+                target[3] = host
+                target_ip = ".".join(str(x) for x in target)
+                if target_ip != local_ip:
+                    subprocess.run(
+                        ["ping", "-n", "1", "-w", "300", target_ip],
+                        capture_output=True, timeout=3,
+                    )
+        except Exception:
+            pass  # Best-effort; ARP table may already have entries
 
     def _check_ethernet_link(self, w) -> bool:
         """Check if the configured ethernet adapter has an active link."""
