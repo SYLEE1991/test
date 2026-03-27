@@ -133,72 +133,68 @@ class ScanWindow:
         prefix_dash = f"{mac_prefix[0:2]}-{mac_prefix[2:4]}-{mac_prefix[4:6]}"
 
         local_ip = ethernet_cfg.static_ip
-        ip_parts = [int(x) for x in local_ip.split(".")]
-        mask_parts = [int(x) for x in ethernet_cfg.subnet_mask.split(".")]
-        base = [ip_parts[i] & mask_parts[i] for i in range(4)]
-
         ethernet_name = ethernet_cfg.name
 
-        # Phase 1: Priority IP
-        priority_ip = self._config.target_device.priority_ip
-        if priority_ip:
-            self._update_status(f"Checking priority IP: {priority_ip}...")
-            try:
-                subprocess.run(
-                    ["ping", "-n", "1", "-w", "500", priority_ip],
-                    capture_output=True, timeout=5,
-                )
-            except Exception:
-                pass
+        if mode == "direct":
+            # ==========================================
+            # Direct Connection: IP 서브넷과 무관하게
+            # 이더넷 어댑터에 연결된 장비를 MAC으로 찾음
+            # ==========================================
+            self._update_status("Checking ethernet adapter neighbors...")
+
+            # Get-NetNeighbor로 이더넷에 연결된 모든 neighbor 직접 조회
+            # ping 스캔 불필요 - OS가 이미 알고 있는 neighbor 목록 사용
             self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
-        # Phase 2: Subnet scan
-        if mode == "direct":
-            # Direct connection: only ping priority IP + gateway + a few common IPs
-            # No need to scan 254 hosts for a single cable-connected device
-            candidate_ips = set()
-            if priority_ip:
-                candidate_ips.add(priority_ip)
-            # Add gateway
-            gw = self._config.ethernet_adapter.gateway
-            if gw:
-                candidate_ips.add(gw)
-            # Add common device IPs (.1, .2, .100, .200, .206, .254)
-            for host in [1, 2, 100, 200, 206, 254]:
-                target = base.copy()
-                target[3] = host
-                candidate_ips.add(".".join(str(x) for x in target))
-            candidate_ips.discard(local_ip)
-
-            total = len(candidate_ips)
-            scanned = [0]
-            self._update_status(f"Checking direct connection ({total} IPs)...")
-
-            for ip in candidate_ips:
+            # 못 찾았으면 broadcast ping 한번으로 neighbor 테이블 갱신 후 재시도
+            if not self._found_devices:
+                self._update_status("Sending broadcast to discover devices...")
                 try:
+                    # 브로드캐스트 ping으로 같은 링크의 장비 응답 유도
                     subprocess.run(
-                        ["ping", "-n", "1", "-w", "500", ip],
+                        ["ping", "-n", "2", "-w", "1000", "255.255.255.255"],
                         capture_output=True, timeout=5,
                     )
                 except Exception:
                     pass
-                scanned[0] += 1
-                self._update_status(f"Checking... {scanned[0]}/{total}")
 
-            # If no match yet, also try a quick broadcast ping
-            self._update_status("Checking broadcast...")
-            broadcast_parts = [(ip_parts[i] | (~mask_parts[i] & 0xFF)) for i in range(4)]
-            broadcast = ".".join(str(x) for x in broadcast_parts)
-            try:
-                subprocess.run(
-                    ["ping", "-n", "2", "-w", "500", broadcast],
-                    capture_output=True, timeout=5,
-                )
-            except Exception:
-                pass
+                # priority IP가 있으면 직접 ping
+                priority_ip = self._config.target_device.priority_ip
+                if priority_ip:
+                    self._update_status(f"Pinging {priority_ip}...")
+                    try:
+                        subprocess.run(
+                            ["ping", "-n", "2", "-w", "1000", priority_ip],
+                            capture_output=True, timeout=5,
+                        )
+                    except Exception:
+                        pass
+
+                self._update_status("Re-checking neighbors...")
+                self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
         else:
-            # Network scan: full /24 sweep
+            # ==========================================
+            # Network Scan: 모든 인터페이스에서 전체 검색
+            # ==========================================
+            ip_parts = [int(x) for x in local_ip.split(".")]
+            mask_parts = [int(x) for x in ethernet_cfg.subnet_mask.split(".")]
+            base = [ip_parts[i] & mask_parts[i] for i in range(4)]
+
+            # Priority IP 먼저
+            priority_ip = self._config.target_device.priority_ip
+            if priority_ip:
+                self._update_status(f"Checking priority IP: {priority_ip}...")
+                try:
+                    subprocess.run(
+                        ["ping", "-n", "1", "-w", "500", priority_ip],
+                        capture_output=True, timeout=5,
+                    )
+                except Exception:
+                    pass
+                self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
+
+            # Full /24 sweep
             total = 254
             scanned = [0]
             self._update_status("Scanning full subnet...")
@@ -223,10 +219,9 @@ class ScanWindow:
             with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
                 pool.map(ping_host, range(1, 255))
 
-        # Collect final results
-        self._update_status("Analyzing results...")
-        self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
+            self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
+        self._update_status("Scan complete")
         self._root.after(0, self._scan_complete)
 
     def _collect_devices(self, prefix_dash, raw_prefix, mode, ethernet_name, ethernet_ip):
