@@ -40,6 +40,7 @@ class TrayApp:
         self._net_config = network_config
         self._bridge_mgr = bridge_manager
         self._state = "monitoring"
+        self._device_info = None  # DetectedDevice when active
         self._icon = None
 
     def run(self):
@@ -47,6 +48,8 @@ class TrayApp:
 
         menu = pystray.Menu(
             pystray.MenuItem(lambda _: f"Status: {STATE_LABELS.get(self._state, self._state)}", None, enabled=False),
+            pystray.MenuItem(lambda _: f"Device IP: {self._device_info.ip}" if self._device_info and self._device_info.ip else "Device IP: -", None, enabled=False),
+            pystray.MenuItem(lambda _: f"Device MAC: {self._device_info.mac}" if self._device_info and self._device_info.mac else "Device MAC: -", None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Open Settings", self._open_settings),
             pystray.MenuItem("Force Bridge Now", self._force_bridge),
@@ -67,11 +70,15 @@ class TrayApp:
         logger.info("Tray application started")
         self._icon.run()  # Blocks
 
-    def update_state(self, new_state: str):
+    def update_state(self, new_state: str, device_info=None):
         self._state = new_state
+        self._device_info = device_info
         if self._icon:
             self._icon.icon = _create_icon_image(STATE_COLORS.get(new_state, (100, 100, 100)))
-            self._icon.title = f"Network Bridge - {STATE_LABELS.get(new_state, new_state)}"
+            title = f"Network Bridge - {STATE_LABELS.get(new_state, new_state)}"
+            if device_info and device_info.ip:
+                title += f" ({device_info.ip})"
+            self._icon.title = title
 
     def _open_settings(self, icon, item):
         threading.Thread(target=self._show_gui, daemon=True).start()

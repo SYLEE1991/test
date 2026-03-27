@@ -5,6 +5,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class DetectedDevice:
+    """Info about a detected device."""
+
+    def __init__(self, ip: str = "", mac: str = "", method: str = ""):
+        self.ip = ip
+        self.mac = mac
+        self.method = method  # detection method that found it
+
+    def __repr__(self):
+        return f"DetectedDevice(ip={self.ip!r}, mac={self.mac!r}, method={self.method!r})"
+
+
 class DeviceMonitor:
     """Polls WMI for target device presence and fires callbacks on state changes."""
 
@@ -13,6 +25,7 @@ class DeviceMonitor:
         self._on_connected = on_device_connected
         self._on_disconnected = on_device_disconnected
         self._device_present = False
+        self._detected_device = None  # DetectedDevice when connected
         self._running = False
         self._thread = None
 
@@ -32,6 +45,11 @@ class DeviceMonitor:
     def is_device_present(self):
         return self._device_present
 
+    @property
+    def detected_device(self):
+        """Returns DetectedDevice info (ip, mac) if device is present, else None."""
+        return self._detected_device
+
     def _poll_loop(self):
         # WMI uses COM; must initialize COM on this thread
         import pythoncom
@@ -41,13 +59,16 @@ class DeviceMonitor:
             w = wmi.WMI()
             while self._running:
                 try:
-                    found = self._check_device(w)
+                    device_info = self._check_device(w)
+                    found = device_info is not None
                     if found and not self._device_present:
                         self._device_present = True
-                        logger.info("Target device CONNECTED")
-                        self._on_connected()
+                        self._detected_device = device_info
+                        logger.info("Target device CONNECTED: %s", device_info)
+                        self._on_connected(device_info)
                     elif not found and self._device_present:
                         self._device_present = False
+                        self._detected_device = None
                         logger.info("Target device DISCONNECTED")
                         self._on_disconnected()
                 except Exception:
@@ -56,17 +77,19 @@ class DeviceMonitor:
         finally:
             pythoncom.CoUninitialize()
 
-    def _check_device(self, w) -> bool:
+    def _check_device(self, w):
+        """Check for target device. Returns DetectedDevice if found, None otherwise."""
         device_cfg = self._config.target_device
 
         if device_cfg.detection_method == "hardware_id":
-            # Match by PNP Device ID (partial match via LIKE)
             query = (
                 f"SELECT * FROM Win32_PnPEntity "
                 f"WHERE PNPDeviceID LIKE '%{device_cfg.hardware_id}%'"
             )
             results = w.query(query)
-            return len(results) > 0
+            if results:
+                return DetectedDevice(method="hardware_id")
+            return None
 
         elif device_cfg.detection_method == "friendly_name":
             query = (
@@ -74,43 +97,45 @@ class DeviceMonitor:
                 f"WHERE Name LIKE '%{device_cfg.friendly_name}%'"
             )
             results = w.query(query)
-            return len(results) > 0
+            if results:
+                return DetectedDevice(method="friendly_name")
+            return None
 
         elif device_cfg.detection_method == "mac_address":
-            # Detect by MAC address prefix (OUI) on the ethernet adapter
             return self._check_mac_address(w, device_cfg.mac_prefix)
 
         elif device_cfg.detection_method == "ethernet_link":
-            # Simply detect if the ethernet adapter has link up
-            return self._check_ethernet_link(w)
+            if self._check_ethernet_link(w):
+                return DetectedDevice(method="ethernet_link")
+            return None
 
-        return False
+        return None
 
-    def _check_mac_address(self, w, mac_prefix: str) -> bool:
+    def _check_mac_address(self, w, mac_prefix: str):
         """Check if a device with matching MAC prefix is on the ethernet link.
+
+        Returns DetectedDevice(ip, mac) if found, None otherwise.
 
         Steps:
         1. Check ethernet link is up (no point scanning if cable is disconnected)
         2. Send a subnet broadcast ping to populate the ARP table
-        3. Also try GetIpNetTable via PowerShell for reliable neighbor discovery
-        4. Search ARP/neighbor table for MAC prefix match
+        3. Also try Get-NetNeighbor via PowerShell for reliable neighbor discovery
+        4. Search ARP/neighbor table for MAC prefix match → return IP + full MAC
         """
         import subprocess
 
         # First, check if ethernet link is even up
         if not self._check_ethernet_link(w):
-            return False
+            return None
 
         # Normalize prefix: accept "78:E9:80", "78-E9-80", "78E980"
         raw = mac_prefix.upper().replace(":", "").replace("-", "")
         if len(raw) < 6:
             logger.warning("MAC prefix too short: %s", mac_prefix)
-            return False
+            return None
         prefix_dash = f"{raw[0:2]}-{raw[2:4]}-{raw[4:6]}"
-        prefix_colon = f"{raw[0:2]}:{raw[2:4]}:{raw[4:6]}"
 
         # Trigger ARP population: ping the subnet broadcast or common gateway
-        # This ensures the ARP table has entries for recently-connected devices
         ethernet_cfg = self._config.ethernet_adapter
         self._populate_arp_table(ethernet_cfg.static_ip, ethernet_cfg.subnet_mask)
 
@@ -126,8 +151,10 @@ class DeviceMonitor:
                 if len(parts) >= 2:
                     mac = parts[1].upper()
                     if mac.startswith(prefix_dash):
-                        logger.info("Found target device: MAC=%s IP=%s", mac, parts[0])
-                        return True
+                        device_ip = parts[0]
+                        full_mac = mac
+                        logger.info("Found target device: MAC=%s IP=%s", full_mac, device_ip)
+                        return DetectedDevice(ip=device_ip, mac=full_mac, method="mac_address")
         except Exception:
             logger.exception("ARP table query failed")
 
@@ -144,14 +171,16 @@ class DeviceMonitor:
                     continue
                 parts = line.split()
                 if len(parts) >= 2:
-                    mac = parts[1].upper().replace("-", "").replace(":", "")
-                    if mac.startswith(raw[:6]):
-                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", parts[1], parts[0])
-                        return True
+                    mac_clean = parts[1].upper().replace("-", "").replace(":", "")
+                    if mac_clean.startswith(raw[:6]):
+                        device_ip = parts[0]
+                        full_mac = parts[1].upper()
+                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", full_mac, device_ip)
+                        return DetectedDevice(ip=device_ip, mac=full_mac, method="mac_address")
         except Exception:
             logger.exception("Get-NetNeighbor query failed")
 
-        return False
+        return None
 
     @staticmethod
     def _populate_arp_table(local_ip: str, subnet_mask: str):

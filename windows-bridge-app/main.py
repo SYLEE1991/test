@@ -68,8 +68,9 @@ def main():
     # Will be set after tray is created
     tray = None
 
-    def on_device_connected():
+    def on_device_connected(device_info):
         logger.info("=== Device Connected - Configuring Network ===")
+        logger.info("Detected device IP: %s, MAC: %s", device_info.ip, device_info.mac)
 
         ok = net_config.set_static_ip(
             config.ethernet_adapter.name,
@@ -96,10 +97,10 @@ def main():
                 config.wifi_adapter.name,
             )
             if tray:
-                tray.update_state("active" if bridge_ok else "error")
+                tray.update_state("active", device_info)
         else:
             if tray:
-                tray.update_state("active")
+                tray.update_state("active", device_info)
 
         logger.info("=== Network configuration complete ===")
 
