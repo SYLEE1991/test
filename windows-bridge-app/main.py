@@ -54,6 +54,7 @@ def main():
     from app.network_config import NetworkConfigurator
     from app.bridge_manager import BridgeManager
     from app.tray import TrayApp
+    from app.scan_window import ScanWindow
 
     config_mgr = ConfigManager(config_path)
     config = config_mgr.load()
@@ -62,6 +63,15 @@ def main():
     logger = logging.getLogger("main")
     logger.info("Network Bridge App starting...")
 
+    # --- Show scan window on startup ---
+    logger.info("Opening startup scan window...")
+    scan = ScanWindow(config)
+    found_devices = scan.run()
+    logger.info("Scan complete. Found %d device(s)", len(found_devices))
+    for d in found_devices:
+        logger.info("  -> IP=%s  MAC=%s", d["ip"], d["mac"])
+
+    # --- Continue to tray app for background monitoring ---
     net_config = NetworkConfigurator()
     bridge_mgr = BridgeManager()
 
