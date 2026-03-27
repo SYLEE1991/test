@@ -53,15 +53,15 @@ class AppConfig:
 DEFAULT_CONFIG = {
     "target_device": {
         "hardware_id": "USB\\VID_XXXX&PID_XXXX",
-        "friendly_name": "My Network Device",
+        "friendly_name": "Infortab Gateway",
         "mac_prefix": "78:E9:80",
         "detection_method": "mac_address",
     },
     "ethernet_adapter": {
         "name": "Ethernet",
-        "static_ip": "192.168.1.100",
+        "static_ip": "192.168.220.100",
         "subnet_mask": "255.255.255.0",
-        "gateway": "192.168.1.1",
+        "gateway": "192.168.220.1",
         "dns_primary": "8.8.8.8",
         "dns_secondary": "8.8.4.4",
     },

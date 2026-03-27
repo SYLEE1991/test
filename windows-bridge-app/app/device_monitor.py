@@ -184,33 +184,43 @@ class DeviceMonitor:
 
     @staticmethod
     def _populate_arp_table(local_ip: str, subnet_mask: str):
-        """Send broadcast ping to populate ARP table for the local subnet."""
-        import subprocess
+        """Scan the local subnet to populate the ARP table.
 
-        # Calculate broadcast address from IP and mask
+        Uses parallel ping across the full /24 subnet so that devices
+        like the Infortab gateway (e.g. 192.168.220.72) are discovered
+        regardless of their host address.
+        """
+        import subprocess
+        import concurrent.futures
+
         try:
             ip_parts = [int(x) for x in local_ip.split(".")]
             mask_parts = [int(x) for x in subnet_mask.split(".")]
+            base = [ip_parts[i] & mask_parts[i] for i in range(4)]
+
+            # Broadcast ping first
             broadcast_parts = [(ip_parts[i] | (~mask_parts[i] & 0xFF)) for i in range(4)]
             broadcast = ".".join(str(x) for x in broadcast_parts)
-
-            # Ping broadcast (will timeout quickly, but populates ARP)
             subprocess.run(
                 ["ping", "-n", "1", "-w", "500", broadcast],
                 capture_output=True, timeout=5,
             )
 
-            # Also ping a few common addresses in the subnet
-            base = [ip_parts[i] & mask_parts[i] for i in range(4)]
-            for host in [1, 2, 254]:
+            # Parallel ping sweep of the entire /24 subnet
+            # This quickly populates the ARP table for all live hosts
+            def ping_host(host_id):
                 target = base.copy()
-                target[3] = host
+                target[3] = host_id
                 target_ip = ".".join(str(x) for x in target)
                 if target_ip != local_ip:
                     subprocess.run(
-                        ["ping", "-n", "1", "-w", "300", target_ip],
+                        ["ping", "-n", "1", "-w", "200", target_ip],
                         capture_output=True, timeout=3,
                     )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
+                pool.map(ping_host, range(1, 255))
+
         except Exception:
             pass  # Best-effort; ARP table may already have entries
 
