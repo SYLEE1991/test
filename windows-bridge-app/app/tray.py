@@ -51,6 +51,7 @@ class TrayApp:
             pystray.MenuItem(lambda _: f"Device IP: {self._device_info.ip}" if self._device_info and self._device_info.ip else "Device IP: -", None, enabled=False),
             pystray.MenuItem(lambda _: f"Device MAC: {self._device_info.mac}" if self._device_info and self._device_info.mac else "Device MAC: -", None, enabled=False),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Device Manager", self._open_device_popup),
             pystray.MenuItem("Open Settings", self._open_settings),
             pystray.MenuItem("Force Bridge Now", self._force_bridge),
             pystray.MenuItem("Remove Bridge", self._remove_bridge),
@@ -79,6 +80,13 @@ class TrayApp:
             if device_info and device_info.ip:
                 title += f" ({device_info.ip})"
             self._icon.title = title
+
+    def _open_device_popup(self, icon, item):
+        threading.Thread(target=self._show_device_popup, daemon=True).start()
+
+    def _show_device_popup(self):
+        from app.device_popup import DevicePopup
+        DevicePopup(self._monitor, self._config_mgr).run()
 
     def _open_settings(self, icon, item):
         threading.Thread(target=self._show_gui, daemon=True).start()
