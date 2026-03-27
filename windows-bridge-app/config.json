@@ -3,6 +3,7 @@
     "hardware_id": "USB\\VID_XXXX&PID_XXXX",
     "friendly_name": "Infortab Gateway",
     "mac_prefix": "78:E9:80",
+    "priority_ip": "192.168.220.206",
     "detection_method": "mac_address"
   },
   "ethernet_adapter": {

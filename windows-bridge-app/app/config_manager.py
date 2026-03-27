@@ -7,7 +7,8 @@ from pathlib import Path
 class TargetDevice:
     hardware_id: str
     friendly_name: str
-    mac_prefix: str  # OUI prefix, e.g. "00:1A:2B" (first 3 bytes of MAC)
+    mac_prefix: str  # OUI prefix, e.g. "78:E9:80" (first 3 bytes of MAC)
+    priority_ip: str  # Most common device IP, checked first for fast detection
     detection_method: str  # "hardware_id", "friendly_name", "mac_address", or "ethernet_link"
 
 
@@ -55,6 +56,7 @@ DEFAULT_CONFIG = {
         "hardware_id": "USB\\VID_XXXX&PID_XXXX",
         "friendly_name": "Infortab Gateway",
         "mac_prefix": "78:E9:80",
+        "priority_ip": "192.168.220.206",
         "detection_method": "mac_address",
     },
     "ethernet_adapter": {

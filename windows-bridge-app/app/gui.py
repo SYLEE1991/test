@@ -49,12 +49,17 @@ class SettingsWindow:
         ttk.Label(device_frame, text="MAC Prefix (OUI):").grid(row=3, column=0, sticky="w", pady=5)
         self._mac_prefix = tk.StringVar(value=config.target_device.mac_prefix)
         ttk.Entry(device_frame, textvariable=self._mac_prefix, width=20).grid(row=3, column=1, sticky="w")
-        ttk.Label(device_frame, text="(예: 00:1A:2B)").grid(row=3, column=2, sticky="w")
+        ttk.Label(device_frame, text="(예: 78:E9:80)").grid(row=3, column=2, sticky="w")
 
-        ttk.Button(device_frame, text="Scan USB Devices", command=self._scan_devices).grid(row=4, column=0, columnspan=3, pady=10)
+        ttk.Label(device_frame, text="Priority IP:").grid(row=4, column=0, sticky="w", pady=5)
+        self._priority_ip = tk.StringVar(value=config.target_device.priority_ip)
+        ttk.Entry(device_frame, textvariable=self._priority_ip, width=20).grid(row=4, column=1, sticky="w")
+        ttk.Label(device_frame, text="(우선 확인할 IP)").grid(row=4, column=2, sticky="w")
+
+        ttk.Button(device_frame, text="Scan USB Devices", command=self._scan_devices).grid(row=5, column=0, columnspan=3, pady=10)
 
         self._device_listbox = tk.Listbox(device_frame, height=6, width=60)
-        self._device_listbox.grid(row=5, column=0, columnspan=3, sticky="we")
+        self._device_listbox.grid(row=6, column=0, columnspan=3, sticky="we")
         self._device_listbox.bind("<<ListboxSelect>>", self._on_device_select)
 
         # -- Network Tab --
@@ -128,6 +133,7 @@ class SettingsWindow:
                 hardware_id=self._hardware_id.get(),
                 friendly_name=self._friendly_name.get(),
                 mac_prefix=self._mac_prefix.get(),
+                priority_ip=self._priority_ip.get(),
                 detection_method=self._detection_method.get(),
             ),
             ethernet_adapter=EthernetConfig(

@@ -116,30 +116,62 @@ class DeviceMonitor:
 
         Returns DetectedDevice(ip, mac) if found, None otherwise.
 
-        Steps:
-        1. Check ethernet link is up (no point scanning if cable is disconnected)
-        2. Send a subnet broadcast ping to populate the ARP table
-        3. Also try Get-NetNeighbor via PowerShell for reliable neighbor discovery
-        4. Search ARP/neighbor table for MAC prefix match → return IP + full MAC
+        Two-phase detection for speed:
+          Phase 1: Ping priority_ip (e.g. 192.168.220.206) directly → check ARP
+                   This completes in ~1 second if the device is at the expected IP.
+          Phase 2: If not found, do a full /24 subnet scan → check ARP again
+                   This handles devices at unexpected IPs.
         """
         import subprocess
 
-        # First, check if ethernet link is even up
         if not self._check_ethernet_link(w):
             return None
 
-        # Normalize prefix: accept "78:E9:80", "78-E9-80", "78E980"
+        # Normalize MAC prefix
         raw = mac_prefix.upper().replace(":", "").replace("-", "")
         if len(raw) < 6:
             logger.warning("MAC prefix too short: %s", mac_prefix)
             return None
         prefix_dash = f"{raw[0:2]}-{raw[2:4]}-{raw[4:6]}"
 
-        # Trigger ARP population: ping the subnet broadcast or common gateway
+        priority_ip = self._config.target_device.priority_ip
         ethernet_cfg = self._config.ethernet_adapter
+
+        # --- Phase 1: Quick check at priority IP ---
+        if priority_ip:
+            logger.debug("Phase 1: checking priority IP %s", priority_ip)
+            try:
+                subprocess.run(
+                    ["ping", "-n", "1", "-w", "500", priority_ip],
+                    capture_output=True, timeout=5,
+                )
+            except Exception:
+                pass
+
+            result = self._find_mac_in_arp(prefix_dash, raw)
+            if result:
+                logger.info("Phase 1 hit: device found at priority IP")
+                return result
+
+        # --- Phase 2: Full subnet scan ---
+        logger.debug("Phase 2: full subnet scan")
         self._populate_arp_table(ethernet_cfg.static_ip, ethernet_cfg.subnet_mask)
 
-        # Method 1: Check ARP table via 'arp -a'
+        result = self._find_mac_in_arp(prefix_dash, raw)
+        if result:
+            logger.info("Phase 2 hit: device found via subnet scan")
+            return result
+
+        return None
+
+    def _find_mac_in_arp(self, prefix_dash: str, raw_prefix: str):
+        """Search ARP table and Get-NetNeighbor for a matching MAC prefix.
+
+        Returns DetectedDevice if found, None otherwise.
+        """
+        import subprocess
+
+        # Method 1: arp -a
         try:
             result = subprocess.run(
                 ["arp", "-a"],
@@ -151,14 +183,12 @@ class DeviceMonitor:
                 if len(parts) >= 2:
                     mac = parts[1].upper()
                     if mac.startswith(prefix_dash):
-                        device_ip = parts[0]
-                        full_mac = mac
-                        logger.info("Found target device: MAC=%s IP=%s", full_mac, device_ip)
-                        return DetectedDevice(ip=device_ip, mac=full_mac, method="mac_address")
+                        logger.info("Found target device: MAC=%s IP=%s", mac, parts[0])
+                        return DetectedDevice(ip=parts[0], mac=mac, method="mac_address")
         except Exception:
             logger.exception("ARP table query failed")
 
-        # Method 2: Check via PowerShell Get-NetNeighbor (more reliable on Win10+)
+        # Method 2: Get-NetNeighbor (more reliable on Win10+)
         try:
             ps_cmd = "Get-NetNeighbor | Where-Object { $_.State -ne 'Unreachable' } | Select-Object -Property IPAddress,LinkLayerAddress | Format-Table -HideTableHeaders"
             result = subprocess.run(
@@ -172,11 +202,9 @@ class DeviceMonitor:
                 parts = line.split()
                 if len(parts) >= 2:
                     mac_clean = parts[1].upper().replace("-", "").replace(":", "")
-                    if mac_clean.startswith(raw[:6]):
-                        device_ip = parts[0]
-                        full_mac = parts[1].upper()
-                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", full_mac, device_ip)
-                        return DetectedDevice(ip=device_ip, mac=full_mac, method="mac_address")
+                    if mac_clean.startswith(raw_prefix[:6]):
+                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", parts[1].upper(), parts[0])
+                        return DetectedDevice(ip=parts[0], mac=parts[1].upper(), method="mac_address")
         except Exception:
             logger.exception("Get-NetNeighbor query failed")
 
