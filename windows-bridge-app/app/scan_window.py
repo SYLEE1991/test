@@ -152,30 +152,76 @@ class ScanWindow:
                 pass
             self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
-        # Phase 2: Full subnet ping sweep
-        total = 254
-        scanned = [0]
-        self._update_status("Scanning subnet...")
+        # Phase 2: Subnet scan
+        if mode == "direct":
+            # Direct connection: only ping priority IP + gateway + a few common IPs
+            # No need to scan 254 hosts for a single cable-connected device
+            candidate_ips = set()
+            if priority_ip:
+                candidate_ips.add(priority_ip)
+            # Add gateway
+            gw = self._config.ethernet_adapter.gateway
+            if gw:
+                candidate_ips.add(gw)
+            # Add common device IPs (.1, .2, .100, .200, .206, .254)
+            for host in [1, 2, 100, 200, 206, 254]:
+                target = base.copy()
+                target[3] = host
+                candidate_ips.add(".".join(str(x) for x in target))
+            candidate_ips.discard(local_ip)
 
-        def ping_host(host_id):
-            target = base.copy()
-            target[3] = host_id
-            target_ip = ".".join(str(x) for x in target)
-            if target_ip != local_ip:
+            total = len(candidate_ips)
+            scanned = [0]
+            self._update_status(f"Checking direct connection ({total} IPs)...")
+
+            for ip in candidate_ips:
                 try:
                     subprocess.run(
-                        ["ping", "-n", "1", "-w", "200", target_ip],
-                        capture_output=True, timeout=3,
+                        ["ping", "-n", "1", "-w", "500", ip],
+                        capture_output=True, timeout=5,
                     )
                 except Exception:
                     pass
-            scanned[0] += 1
-            if scanned[0] % 25 == 0:
-                pct = int(scanned[0] / total * 100)
-                self._update_status(f"Scanning... {pct}% ({scanned[0]}/{total})")
+                scanned[0] += 1
+                self._update_status(f"Checking... {scanned[0]}/{total}")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
-            pool.map(ping_host, range(1, 255))
+            # If no match yet, also try a quick broadcast ping
+            self._update_status("Checking broadcast...")
+            broadcast_parts = [(ip_parts[i] | (~mask_parts[i] & 0xFF)) for i in range(4)]
+            broadcast = ".".join(str(x) for x in broadcast_parts)
+            try:
+                subprocess.run(
+                    ["ping", "-n", "2", "-w", "500", broadcast],
+                    capture_output=True, timeout=5,
+                )
+            except Exception:
+                pass
+
+        else:
+            # Network scan: full /24 sweep
+            total = 254
+            scanned = [0]
+            self._update_status("Scanning full subnet...")
+
+            def ping_host(host_id):
+                target = base.copy()
+                target[3] = host_id
+                target_ip = ".".join(str(x) for x in target)
+                if target_ip != local_ip:
+                    try:
+                        subprocess.run(
+                            ["ping", "-n", "1", "-w", "200", target_ip],
+                            capture_output=True, timeout=3,
+                        )
+                    except Exception:
+                        pass
+                scanned[0] += 1
+                if scanned[0] % 25 == 0:
+                    pct = int(scanned[0] / total * 100)
+                    self._update_status(f"Scanning... {pct}% ({scanned[0]}/{total})")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
+                pool.map(ping_host, range(1, 255))
 
         # Collect final results
         self._update_status("Analyzing results...")
