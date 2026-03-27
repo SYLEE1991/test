@@ -165,32 +165,26 @@ class DeviceMonitor:
         return None
 
     def _find_mac_in_arp(self, prefix_dash: str, raw_prefix: str):
-        """Search ARP table and Get-NetNeighbor for a matching MAC prefix.
+        """Search ARP/Neighbor table for a matching MAC prefix.
+
+        Only searches entries on the configured ethernet adapter,
+        ignoring WiFi, Bluetooth, and other interfaces.
 
         Returns DetectedDevice if found, None otherwise.
         """
         import subprocess
 
-        # Method 1: arp -a
-        try:
-            result = subprocess.run(
-                ["arp", "-a"],
-                capture_output=True, text=True, timeout=10,
-            )
-            for line in result.stdout.split("\n"):
-                line = line.strip()
-                parts = line.split()
-                if len(parts) >= 2:
-                    mac = parts[1].upper()
-                    if mac.startswith(prefix_dash):
-                        logger.info("Found target device: MAC=%s IP=%s", mac, parts[0])
-                        return DetectedDevice(ip=parts[0], mac=mac, method="mac_address")
-        except Exception:
-            logger.exception("ARP table query failed")
+        ethernet_name = self._config.ethernet_adapter.name
+        ethernet_ip = self._config.ethernet_adapter.static_ip
 
-        # Method 2: Get-NetNeighbor (more reliable on Win10+)
+        # Method 1: Get-NetNeighbor filtered by ethernet adapter (most reliable)
         try:
-            ps_cmd = "Get-NetNeighbor | Where-Object { $_.State -ne 'Unreachable' } | Select-Object -Property IPAddress,LinkLayerAddress | Format-Table -HideTableHeaders"
+            ps_cmd = (
+                f"Get-NetNeighbor -InterfaceAlias '{ethernet_name}' -ErrorAction SilentlyContinue | "
+                f"Where-Object {{ $_.State -ne 'Unreachable' }} | "
+                f"Select-Object -Property IPAddress,LinkLayerAddress | "
+                f"Format-Table -HideTableHeaders"
+            )
             result = subprocess.run(
                 ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
                 capture_output=True, text=True, timeout=15,
@@ -203,10 +197,27 @@ class DeviceMonitor:
                 if len(parts) >= 2:
                     mac_clean = parts[1].upper().replace("-", "").replace(":", "")
                     if mac_clean.startswith(raw_prefix[:6]):
-                        logger.info("Found target device (NetNeighbor): MAC=%s IP=%s", parts[1].upper(), parts[0])
+                        logger.info("Found target device (Ethernet only): MAC=%s IP=%s", parts[1].upper(), parts[0])
                         return DetectedDevice(ip=parts[0], mac=parts[1].upper(), method="mac_address")
         except Exception:
             logger.exception("Get-NetNeighbor query failed")
+
+        # Method 2: arp -a filtered by ethernet adapter's IP (fallback)
+        try:
+            result = subprocess.run(
+                ["arp", "-a", "-N", ethernet_ip],
+                capture_output=True, text=True, timeout=10,
+            )
+            for line in result.stdout.split("\n"):
+                line = line.strip()
+                parts = line.split()
+                if len(parts) >= 2:
+                    mac = parts[1].upper()
+                    if mac.startswith(prefix_dash):
+                        logger.info("Found target device (arp -N): MAC=%s IP=%s", mac, parts[0])
+                        return DetectedDevice(ip=parts[0], mac=mac, method="mac_address")
+        except Exception:
+            logger.exception("ARP table query failed")
 
         return None
 
