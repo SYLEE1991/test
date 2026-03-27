@@ -8,100 +8,124 @@ logger = logging.getLogger(__name__)
 
 
 class ScanWindow:
-    """Startup scan window that scans the ethernet subnet and shows detected devices."""
+    """Startup window with scan mode selection and device results."""
 
     def __init__(self, config):
         self._config = config
         self._root = None
         self._found_devices = []
         self._scanning = False
+        self._scan_mode = None  # "all" or "direct"
 
     def run(self):
         """Show scan window. Blocks until closed. Returns list of found devices."""
         self._root = tk.Tk()
         self._root.title("Gateway Device Scanner")
-        self._root.geometry("500x400")
+        self._root.geometry("520x480")
         self._root.resizable(False, False)
-
-        # Center window on screen
-        self._root.update_idletasks()
-        w = self._root.winfo_width()
-        h = self._root.winfo_height()
-        x = (self._root.winfo_screenwidth() // 2) - (w // 2)
-        y = (self._root.winfo_screenheight() // 2) - (h // 2)
-        self._root.geometry(f"+{x}+{y}")
+        self._center_window()
 
         # --- Header ---
         header = ttk.Frame(self._root)
         header.pack(fill="x", padx=15, pady=(15, 5))
-
         ttk.Label(header, text="Gateway Device Scanner", font=("Segoe UI", 14, "bold")).pack(anchor="w")
-
-        info_text = f"Subnet: {self._config.ethernet_adapter.static_ip} / {self._config.ethernet_adapter.subnet_mask}"
-        info_text += f"    MAC Filter: {self._config.target_device.mac_prefix}"
+        info_text = f"MAC Filter: {self._config.target_device.mac_prefix}"
         ttk.Label(header, text=info_text, foreground="gray").pack(anchor="w", pady=(2, 0))
+
+        # --- Scan Mode Selection ---
+        self._mode_frame = ttk.LabelFrame(self._root, text="Scan Mode", padding=10)
+        self._mode_frame.pack(fill="x", padx=15, pady=10)
+
+        btn_all = ttk.Button(
+            self._mode_frame,
+            text="Network Scan\n(All interfaces)",
+            command=lambda: self._start_scan("all"),
+        )
+        btn_all.pack(side="left", expand=True, fill="both", padx=(0, 5), ipady=15)
+
+        btn_direct = ttk.Button(
+            self._mode_frame,
+            text="Direct Connection Scan\n(Ethernet only)",
+            command=lambda: self._start_scan("direct"),
+        )
+        btn_direct.pack(side="left", expand=True, fill="both", padx=(5, 0), ipady=15)
 
         # --- Status ---
         status_frame = ttk.Frame(self._root)
-        status_frame.pack(fill="x", padx=15, pady=(10, 5))
+        status_frame.pack(fill="x", padx=15, pady=(5, 3))
 
-        self._status_label = ttk.Label(status_frame, text="Preparing to scan...", font=("Segoe UI", 10))
+        self._status_label = ttk.Label(status_frame, text="Select scan mode to start.", font=("Segoe UI", 10))
         self._status_label.pack(side="left")
 
         self._count_label = ttk.Label(status_frame, text="", font=("Segoe UI", 10, "bold"))
         self._count_label.pack(side="right")
 
         # --- Progress Bar ---
-        self._progress = ttk.Progressbar(self._root, mode="indeterminate", length=470)
-        self._progress.pack(padx=15, pady=(0, 10))
+        self._progress = ttk.Progressbar(self._root, mode="determinate", length=490, value=0)
+        self._progress.pack(padx=15, pady=(0, 5))
 
         # --- Device List ---
         list_frame = ttk.Frame(self._root)
         list_frame.pack(fill="both", expand=True, padx=15, pady=(0, 5))
 
         columns = ("ip", "mac")
-        self._tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=10)
+        self._tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=8)
         self._tree.heading("ip", text="IP Address")
         self._tree.heading("mac", text="MAC Address")
-        self._tree.column("ip", width=180, anchor="center")
+        self._tree.column("ip", width=190, anchor="center")
         self._tree.column("mac", width=280, anchor="center")
 
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self._tree.yview)
         self._tree.configure(yscrollcommand=scrollbar.set)
-
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # --- Buttons ---
+        # --- Bottom Buttons ---
         btn_frame = ttk.Frame(self._root)
         btn_frame.pack(fill="x", padx=15, pady=(5, 15))
 
-        self._rescan_btn = ttk.Button(btn_frame, text="Re-Scan", command=self._start_scan, state="disabled")
+        self._rescan_btn = ttk.Button(btn_frame, text="Re-Scan", command=self._rescan, state="disabled")
         self._rescan_btn.pack(side="left")
 
         ttk.Button(btn_frame, text="Close", command=self._root.destroy).pack(side="right")
 
-        # Start scanning automatically
-        self._start_scan()
+        self._mode_label = ttk.Label(btn_frame, text="", foreground="gray")
+        self._mode_label.pack(side="left", padx=15)
 
         self._root.mainloop()
         return self._found_devices
 
-    def _start_scan(self):
+    # ---- Scan Control ----
+
+    def _start_scan(self, mode: str):
         if self._scanning:
             return
 
+        self._scan_mode = mode
         self._scanning = True
         self._tree.delete(*self._tree.get_children())
         self._found_devices = []
         self._rescan_btn.config(state="disabled")
-        self._status_label.config(text="Scanning...")
         self._count_label.config(text="")
+        self._progress.config(mode="indeterminate")
         self._progress.start(15)
 
-        threading.Thread(target=self._do_scan, daemon=True).start()
+        if mode == "all":
+            self._status_label.config(text="Scanning all networks...")
+            self._mode_label.config(text="Mode: Network Scan")
+        else:
+            self._status_label.config(text="Scanning ethernet direct connection...")
+            self._mode_label.config(text="Mode: Direct Connection")
 
-    def _do_scan(self):
+        threading.Thread(target=self._do_scan, args=(mode,), daemon=True).start()
+
+    def _rescan(self):
+        if self._scan_mode:
+            self._start_scan(self._scan_mode)
+
+    # ---- Scan Logic ----
+
+    def _do_scan(self, mode: str):
         import concurrent.futures
 
         ethernet_cfg = self._config.ethernet_adapter
@@ -113,8 +137,7 @@ class ScanWindow:
         mask_parts = [int(x) for x in ethernet_cfg.subnet_mask.split(".")]
         base = [ip_parts[i] & mask_parts[i] for i in range(4)]
 
-        total = 254
-        scanned = [0]
+        ethernet_name = ethernet_cfg.name
 
         # Phase 1: Priority IP
         priority_ip = self._config.target_device.priority_ip
@@ -127,10 +150,12 @@ class ScanWindow:
                 )
             except Exception:
                 pass
-            self._check_arp_and_add(prefix_dash, mac_prefix)
+            self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
         # Phase 2: Full subnet ping sweep
-        self._update_status("Scanning full subnet...")
+        total = 254
+        scanned = [0]
+        self._update_status("Scanning subnet...")
 
         def ping_host(host_id):
             target = base.copy()
@@ -152,50 +177,40 @@ class ScanWindow:
         with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
             pool.map(ping_host, range(1, 255))
 
-        # After all pings, check ARP table for matches
+        # Collect final results
         self._update_status("Analyzing results...")
-        self._check_arp_and_add(prefix_dash, mac_prefix)
+        self._collect_devices(prefix_dash, mac_prefix, mode, ethernet_name, local_ip)
 
-        # Also check Get-NetNeighbor
-        self._check_netneighbor_and_add(mac_prefix)
-
-        # Done
-        count = len(self._found_devices)
         self._root.after(0, self._scan_complete)
 
-    def _check_arp_and_add(self, prefix_dash: str, raw_prefix: str):
-        """Check ARP table and add new matching devices to the list."""
-        try:
-            result = subprocess.run(
-                ["arp", "-a"], capture_output=True, text=True, timeout=10,
-            )
-            seen_ips = {d["ip"] for d in self._found_devices}
-            for line in result.stdout.split("\n"):
-                line = line.strip()
-                parts = line.split()
-                if len(parts) >= 2:
-                    mac = parts[1].upper()
-                    if mac.startswith(prefix_dash) and parts[0] not in seen_ips:
-                        device = {"ip": parts[0], "mac": mac}
-                        self._found_devices.append(device)
-                        seen_ips.add(parts[0])
-                        self._root.after(0, lambda d=device: self._add_device_to_tree(d))
-        except Exception:
-            logger.exception("ARP check failed")
+    def _collect_devices(self, prefix_dash, raw_prefix, mode, ethernet_name, ethernet_ip):
+        """Collect matching devices from ARP/Neighbor table.
 
-    def _check_netneighbor_and_add(self, raw_prefix: str):
-        """Check Get-NetNeighbor and add new matching devices."""
+        mode="all"    -> search all interfaces
+        mode="direct" -> search ethernet adapter only
+        """
+        seen_ips = {d["ip"] for d in self._found_devices}
+
+        # --- Get-NetNeighbor ---
         try:
-            ps_cmd = (
-                "Get-NetNeighbor | Where-Object { $_.State -ne 'Unreachable' } | "
-                "Select-Object -Property IPAddress,LinkLayerAddress | "
-                "Format-Table -HideTableHeaders"
-            )
+            if mode == "direct":
+                ps_cmd = (
+                    f"Get-NetNeighbor -InterfaceAlias '{ethernet_name}' -ErrorAction SilentlyContinue | "
+                    f"Where-Object {{ $_.State -ne 'Unreachable' }} | "
+                    f"Select-Object -Property IPAddress,LinkLayerAddress | "
+                    f"Format-Table -HideTableHeaders"
+                )
+            else:
+                ps_cmd = (
+                    "Get-NetNeighbor | Where-Object { $_.State -ne 'Unreachable' } | "
+                    "Select-Object -Property IPAddress,LinkLayerAddress | "
+                    "Format-Table -HideTableHeaders"
+                )
+
             result = subprocess.run(
                 ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
                 capture_output=True, text=True, timeout=15,
             )
-            seen_ips = {d["ip"] for d in self._found_devices}
             for line in result.stdout.split("\n"):
                 line = line.strip()
                 if not line:
@@ -209,13 +224,34 @@ class ScanWindow:
                         seen_ips.add(parts[0])
                         self._root.after(0, lambda d=device: self._add_device_to_tree(d))
         except Exception:
-            logger.exception("Get-NetNeighbor check failed")
+            logger.exception("Get-NetNeighbor failed")
+
+        # --- arp fallback ---
+        try:
+            if mode == "direct":
+                cmd = ["arp", "-a", "-N", ethernet_ip]
+            else:
+                cmd = ["arp", "-a"]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            for line in result.stdout.split("\n"):
+                line = line.strip()
+                parts = line.split()
+                if len(parts) >= 2:
+                    mac = parts[1].upper()
+                    if mac.startswith(prefix_dash) and parts[0] not in seen_ips:
+                        device = {"ip": parts[0], "mac": mac}
+                        self._found_devices.append(device)
+                        seen_ips.add(parts[0])
+                        self._root.after(0, lambda d=device: self._add_device_to_tree(d))
+        except Exception:
+            logger.exception("ARP check failed")
+
+    # ---- UI Helpers ----
 
     def _add_device_to_tree(self, device):
-        """Add a device row to the treeview (called on main thread)."""
         self._tree.insert("", "end", values=(device["ip"], device["mac"]))
-        count = len(self._found_devices)
-        self._count_label.config(text=f"{count} device(s)")
+        self._count_label.config(text=f"{len(self._found_devices)} device(s)")
 
     def _update_status(self, text: str):
         self._root.after(0, lambda: self._status_label.config(text=text))
@@ -223,13 +259,21 @@ class ScanWindow:
     def _scan_complete(self):
         self._scanning = False
         self._progress.stop()
+        self._progress.config(mode="determinate", value=100 if self._found_devices else 0)
         self._rescan_btn.config(state="normal")
 
         count = len(self._found_devices)
+        mode_str = "Network" if self._scan_mode == "all" else "Direct Connection"
         if count == 0:
-            self._status_label.config(text="Scan complete - No devices found")
-            self._progress.config(mode="determinate", value=0)
+            self._status_label.config(text=f"{mode_str} scan complete - No devices found")
         else:
-            self._status_label.config(text="Scan complete")
-            self._progress.config(mode="determinate", value=100)
+            self._status_label.config(text=f"{mode_str} scan complete")
         self._count_label.config(text=f"{count} device(s) found")
+
+    def _center_window(self):
+        self._root.update_idletasks()
+        w = self._root.winfo_width()
+        h = self._root.winfo_height()
+        x = (self._root.winfo_screenwidth() // 2) - (w // 2)
+        y = (self._root.winfo_screenheight() // 2) - (h // 2)
+        self._root.geometry(f"+{x}+{y}")
